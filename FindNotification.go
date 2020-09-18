@@ -9,7 +9,6 @@ import (
 
 func CheckUrlPath(expectedUrlPath *string, doc *xmlquery.Node) bool {
 	urlNodes := xmlquery.Find(doc, "//action//http//url")
-	//log.Println("DEBUG CheckUrlPath got ", len(urlNodes), " url nodes")
 
 	for _, node := range urlNodes {
 		if node.InnerText() == *expectedUrlPath {

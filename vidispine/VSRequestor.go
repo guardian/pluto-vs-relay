@@ -58,7 +58,7 @@ func NewVSRequestor(url url.URL, user string, passwd string) *VSRequestor {
 	}
 }
 
-func (r *VSRequestor) Get(subpath string, contentType string) (io.ReadCloser, error) {
+func (r *VSRequestor) url_to_call(subpath string) (*url.URL, error) {
 	var urlToCall url.URL
 
 	if strings.Contains(subpath, "://") {
@@ -75,13 +75,23 @@ func (r *VSRequestor) Get(subpath string, contentType string) (io.ReadCloser, er
 		urlToCall = r.url
 		urlToCall.Path = subpath
 	}
+	return &urlToCall, nil
+}
 
-	log.Printf("Performing GET to %s", urlToCall.String())
+func (r *VSRequestor) Do(method string, subpath string, accept string, bodyContentType string, body io.Reader) (io.ReadCloser, error) {
+	urlToCall, url_err := r.url_to_call(subpath)
+	if url_err != nil {
+		return nil, url_err
+	}
 
-	req, _ := http.NewRequest("GET", urlToCall.String(), nil)
+	log.Printf("Performing %s to %s", method, urlToCall.String())
+
+	req, _ := http.NewRequest("GET", urlToCall.String(), body)
 	req.Header.Add("Authorization", r.auth)
-	req.Header.Add("Accept", contentType)
-
+	req.Header.Add("Accept", accept)
+	if bodyContentType != "" {
+		req.Header.Add("Content-Type", bodyContentType)
+	}
 	resp, err := r.client.Do(req)
 
 	if err != nil {
@@ -107,8 +117,16 @@ func (r *VSRequestor) Get(subpath string, contentType string) (io.ReadCloser, er
 	case 504:
 		log.Print("Server is not responding, retrying after a few seconds...")
 		time.Sleep(5 * time.Second)
-		return r.Get(subpath, contentType)
+		return r.Do(method, subpath, accept, bodyContentType, body)
 	default:
 		return nil, errors.New(fmt.Sprintf("Unexpected error code %d, server said %s", resp.StatusCode, string(bodyContent)))
 	}
+}
+
+func (r *VSRequestor) Get(subpath string, contentType string) (io.ReadCloser, error) {
+	return r.Do("GET", subpath, contentType, "", nil)
+}
+
+func (r *VSRequestor) Post(subpath string, accept string, bodyContentType string, body io.Reader) (io.ReadCloser, error) {
+	return r.Do("POST", subpath, accept, bodyContentType, body)
 }

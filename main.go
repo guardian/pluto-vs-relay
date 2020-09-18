@@ -36,6 +36,10 @@ func main() {
 
 	if !have_notification {
 		log.Print("Notification not found, adding one...")
+		createErr := CreateNotification(requestor, callback_uri)
+		if createErr != nil {
+			log.Fatal("Could not create notification: ", createErr)
+		}
 	}
 	log.Fatal("Not implemented uet!")
 }
