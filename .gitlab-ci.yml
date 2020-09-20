@@ -6,6 +6,7 @@ buildntest:
   image: golang:1.15-alpine
   stage: buildntest
   script:
+    - apk add alpine-sdk --no-cache
     - go test
     - GOOS=linux GOARCH=amd64 go build -o pluto-vs-relay.linux64
   artifacts:
