@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/streadway/amqp"
 	"gitlab.com/codmill/customer-projects/guardian/pluto-vs-relay/vidispine"
 	"log"
 	"net/http"
@@ -13,6 +14,7 @@ func main() {
 	vidispine_user := os.Getenv("VIDISPINE_USER")
 	vidispine_passwd := os.Getenv("VIDISPINE_PASSWORD")
 	callback_uri_str := os.Getenv("CALLBACK_URI")
+	rabbitmq_uri_str := os.Getenv("RABBITMQ_URI")
 
 	if vidispine_url_str == "" || vidispine_user == "" || vidispine_passwd == "" {
 		log.Fatal("Please set VIDISPINE_URL, VIDISPINE_USER and VIDISPINE_PASSWORD in the environment")
@@ -20,6 +22,10 @@ func main() {
 
 	if callback_uri_str == "" {
 		log.Fatal("Please set CALLBACK_URI int the environment")
+	}
+
+	if rabbitmq_uri_str == "" {
+		log.Fatal("Please set RABBITMQ_URI in the environment")
 	}
 
 	vidispine_url, url_parse_err := url.Parse(vidispine_url_str)
@@ -30,6 +36,11 @@ func main() {
 	callback_url, url_parse_err := url.Parse(callback_uri_str)
 	if url_parse_err != nil {
 		log.Fatal("CALLBACK_URI is not valid: ", url_parse_err)
+	}
+
+	rmq, rmqErr := amqp.Dial(rabbitmq_uri_str)
+	if rmqErr != nil {
+		log.Fatal("Could not connect to rabbitmq: ", rmqErr)
 	}
 
 	requestor := vidispine.NewVSRequestor(*vidispine_url, vidispine_user, vidispine_passwd)
@@ -48,7 +59,9 @@ func main() {
 		}
 	}
 
-	messageHandler := VidispineMessageHandler{}
+	messageHandler := VidispineMessageHandler{
+		Connection: rmq,
+	}
 
 	log.Printf("Callback URL path is %s", callback_url.Path)
 	http.Handle(callback_url.Path, messageHandler)
