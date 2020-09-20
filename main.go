@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/streadway/amqp"
+	"gitlab.com/codmill/customer-projects/guardian/pluto-vs-relay/mocks"
 	"gitlab.com/codmill/customer-projects/guardian/pluto-vs-relay/vidispine"
 	"log"
 	"net/http"
@@ -60,7 +61,7 @@ func main() {
 	}
 
 	messageHandler := VidispineMessageHandler{
-		Connection: rmq,
+		Connection: &mocks.AmqpConnectionShim{Connection: rmq},
 	}
 
 	log.Printf("Callback URL path is %s", callback_url.Path)

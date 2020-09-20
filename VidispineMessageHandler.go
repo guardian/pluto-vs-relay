@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/streadway/amqp"
+	"gitlab.com/codmill/customer-projects/guardian/pluto-vs-relay/mocks"
 	"io"
 	"io/ioutil"
 	"log"
@@ -15,8 +16,7 @@ import (
 )
 
 type VidispineMessageHandler struct {
-	//will have the rabbitmq client in here
-	Connection     *amqp.Connection
+	Connection     mocks.AmqpConnectionInterface
 	ChannelTimeout time.Duration
 	ExchangeName   string
 }
@@ -24,8 +24,8 @@ type VidispineMessageHandler struct {
 /**
 tries to establish a channel to the broker. Retries up to the given timeout.
 */
-func (h VidispineMessageHandler) EstablishChannel() (*amqp.Channel, error) {
-	doneChan := make(chan *amqp.Channel)
+func (h VidispineMessageHandler) EstablishChannel() (mocks.AmqpChannelInterface, error) {
+	doneChan := make(chan mocks.AmqpChannelInterface)
 	abortChan := make(chan interface{})
 
 	go func() {
@@ -146,7 +146,7 @@ func (h VidispineMessageHandler) ServeHTTP(w http.ResponseWriter, req *http.Requ
 
 	bodyContent, readErr := ioutil.ReadAll(req.Body)
 	if readErr != nil {
-		log.Printf("ERROR VidispineMessageHandler could not read content sent by server: ", readErr)
+		log.Print("ERROR VidispineMessageHandler could not read content sent by server: ", readErr)
 		w.WriteHeader(400)
 		return
 	}
