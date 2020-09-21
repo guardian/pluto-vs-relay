@@ -66,14 +66,14 @@ func main() {
 	requestor := vidispine.NewVSRequestor(*vidispine_url, vidispine_user, vidispine_passwd)
 
 	log.Print("Checking for our notification in ", vidispine_url.String())
-	have_notification, check_err := SearchForMyNotification(requestor, callback_url.String())
+	missingNotifications, check_err := SearchForMyNotification(requestor, callback_url.String())
 	if check_err != nil {
 		log.Fatal("Could not check for notification: ", check_err)
 	}
 
-	if !have_notification {
-		log.Print("Notification not found, adding one...")
-		createErr := CreateNotification(requestor, callback_url.String())
+	if len(missingNotifications) > 0 {
+		log.Print("Some notifications were missing: ", missingNotifications)
+		createErr := CreateNotification(requestor, callback_url.String(), missingNotifications)
 		if createErr != nil {
 			log.Fatal("Could not create notification: ", createErr)
 		}

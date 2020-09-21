@@ -2,11 +2,15 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"github.com/antchfx/xmlquery"
 	"gitlab.com/codmill/customer-projects/guardian/pluto-vs-relay/vidispine"
 	"log"
 )
 
+/**
+check if the url given in the document is the one we expect
+*/
 func CheckUrlPath(expectedUrlPath *string, doc *xmlquery.Node) bool {
 	urlNodes := xmlquery.Find(doc, "//action//http//url")
 
@@ -18,7 +22,19 @@ func CheckUrlPath(expectedUrlPath *string, doc *xmlquery.Node) bool {
 	return false
 }
 
-func TestDocument(r *vidispine.VSRequestor, docurl string, expectedUriPtr *string) (bool, error) {
+/**
+check if the notification type in the document is the one we expect
+*/
+func CheckNotificationType(nt *string, doc *xmlquery.Node) bool {
+	triggerNodes := xmlquery.Find(doc, fmt.Sprintf("//trigger//job//%s", *nt))
+
+	return len(triggerNodes) == 1 //multiple nodes don't work
+}
+
+/**
+test the notification whose spec is at the given url to see if the notification type and url match
+*/
+func TestDocument(r *vidispine.VSRequestor, docurl string, expectedUriPtr *string, notificationTypePtr *string) (bool, error) {
 	notificationDoc, serverErr := r.Get(docurl, "application/xml")
 	if serverErr != nil {
 		return false, serverErr
@@ -29,36 +45,43 @@ func TestDocument(r *vidispine.VSRequestor, docurl string, expectedUriPtr *strin
 		return false, parseErr
 	}
 
-	return CheckUrlPath(expectedUriPtr, parsedNotification), nil
+	urlMatch := CheckUrlPath(expectedUriPtr, parsedNotification)
+	notificationTypeMatch := CheckNotificationType(notificationTypePtr, parsedNotification)
+	return urlMatch && notificationTypeMatch, nil
 }
 
 /**
-Searches all available notifications to find our one
+Searches all available notifications to find our ones.
+Returns a list of the notification types that are _missing_.
 */
-func SearchForMyNotification(r *vidispine.VSRequestor, expectedUri string) (bool, error) {
-	listResponse, serverErr := r.Get("/API/job/notification", "application/xml")
-	if serverErr != nil {
-		return false, serverErr
-	}
+func SearchForMyNotification(r *vidispine.VSRequestor, expectedUri string) ([]string, error) {
+	requiredNotificationTypes := []string{"stop", "create", "update"}
+	missingNotificationTypes := make([]string, 0)
 
-	parsedResponse, parseErr := xmlquery.Parse(listResponse)
-	if parseErr != nil {
-		log.Printf("ERROR SearchForMyNotification could not parse server response: %s", parseErr)
-		return false, errors.New("Invalid server response")
-	}
-
-	urinodes := xmlquery.Find(parsedResponse, "//uri")
-	for _, node := range urinodes {
-		log.Print("INFO SearchForMyNotification checking ", node.InnerText())
-		result, err := TestDocument(r, node.InnerText(), &expectedUri)
-		if err != nil {
-			log.Print("ERROR SearchForMyNotification could not process: ", err)
-			return false, err
+	for _, nt := range requiredNotificationTypes {
+		listResponse, serverErr := r.Get("/API/job/notification", "application/xml")
+		if serverErr != nil {
+			return missingNotificationTypes, serverErr
 		}
-		if result {
-			return true, nil
+
+		parsedResponse, parseErr := xmlquery.Parse(listResponse)
+		if parseErr != nil {
+			log.Printf("ERROR SearchForMyNotification could not parse server response: %s", parseErr)
+			return missingNotificationTypes, errors.New("Invalid server response")
+		}
+
+		urinodes := xmlquery.Find(parsedResponse, "//uri")
+		for _, node := range urinodes {
+			log.Print("INFO SearchForMyNotification checking ", node.InnerText())
+			result, err := TestDocument(r, node.InnerText(), &expectedUri, &nt)
+			if err != nil {
+				log.Print("ERROR SearchForMyNotification could not process: ", err)
+				return missingNotificationTypes, err
+			}
+			if result {
+				missingNotificationTypes = append(missingNotificationTypes, nt)
+			}
 		}
 	}
-
-	return false, nil
+	return missingNotificationTypes, nil
 }

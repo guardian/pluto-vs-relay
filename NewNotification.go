@@ -14,7 +14,7 @@ import (
 create and test a simple notification document.
 if the result does not parse as xml, returns an error
 */
-func CreateNotificationDoc(callback_uri string) (string, error) {
+func CreateNotificationDoc(callbackUri string, jobType string) (string, error) {
 	basestring := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <NotificationDocument xmlns="http://xml.vidispine.com/schema/vidispine">
   <action>
@@ -28,9 +28,7 @@ func CreateNotificationDoc(callback_uri string) (string, error) {
   </action>
   <trigger>
     <job>
-      <stop/>
-	  <create/>
-	  <update/>
+      <%s/>
     </job>
   </trigger>
 </NotificationDocument>`
@@ -38,27 +36,29 @@ func CreateNotificationDoc(callback_uri string) (string, error) {
 	if test_err != nil {
 		return "", test_err
 	}
-	return fmt.Sprintf(basestring, callback_uri), nil
+	return fmt.Sprintf(basestring, callbackUri, jobType), nil
 }
 
-func CreateNotification(r *vidispine.VSRequestor, callback_uri string) error {
-	newdoc, build_err := CreateNotificationDoc(callback_uri)
-	if build_err != nil {
-		log.Print("ERROR CreateNotification could not build a valid xml document: ", build_err)
-		return errors.New("could not build valid xml")
+func CreateNotification(r *vidispine.VSRequestor, callback_uri string, requiredNotificationTypes []string) error {
+	for _, nt := range requiredNotificationTypes {
+		newdoc, build_err := CreateNotificationDoc(callback_uri, nt)
+		if build_err != nil {
+			log.Print("ERROR CreateNotification could not build a valid xml document: ", build_err)
+			return errors.New("could not build valid xml")
+		}
+
+		response, serverErr := r.Post("/API/job/notification",
+			"application/xml",
+			"application/xml",
+			strings.NewReader(newdoc),
+		)
+
+		if serverErr != nil {
+			return serverErr
+		}
+
+		serverResponseBytes, _ := ioutil.ReadAll(response)
+		log.Printf("Notification created succesfully: %s", string(serverResponseBytes))
 	}
-
-	response, serverErr := r.Post("/API/job/notification",
-		"application/xml",
-		"application/xml",
-		strings.NewReader(newdoc),
-	)
-
-	if serverErr != nil {
-		return serverErr
-	}
-
-	serverResponseBytes, _ := ioutil.ReadAll(response)
-	log.Printf("Notification created succesfully: %s", string(serverResponseBytes))
 	return nil
 }
