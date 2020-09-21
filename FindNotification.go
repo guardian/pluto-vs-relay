@@ -32,7 +32,8 @@ func CheckNotificationType(nt *string, doc *xmlquery.Node) bool {
 }
 
 /**
-test the notification whose spec is at the given url to see if the notification type and url match
+test the notification whose spec is at the given url to see if the notification type and url match.
+returns "true" if the doc matches or "false" otherwise
 */
 func TestDocument(r *vidispine.VSRequestor, docurl string, expectedUriPtr *string, notificationTypePtr *string) (bool, error) {
 	notificationDoc, serverErr := r.Get(docurl, "application/xml")
@@ -54,34 +55,30 @@ func TestDocument(r *vidispine.VSRequestor, docurl string, expectedUriPtr *strin
 Searches all available notifications to find our ones.
 Returns a list of the notification types that are _missing_.
 */
-func SearchForMyNotification(r *vidispine.VSRequestor, expectedUri string) ([]string, error) {
-	requiredNotificationTypes := []string{"stop", "create", "update"}
-	missingNotificationTypes := make([]string, 0)
+func SearchForMyNotification(r *vidispine.VSRequestor, expectedUri string, notificationType string) (bool, error) {
+	listResponse, serverErr := r.Get("/API/job/notification", "application/xml")
+	if serverErr != nil {
+		return false, serverErr
+	}
 
-	for _, nt := range requiredNotificationTypes {
-		listResponse, serverErr := r.Get("/API/job/notification", "application/xml")
-		if serverErr != nil {
-			return missingNotificationTypes, serverErr
+	parsedResponse, parseErr := xmlquery.Parse(listResponse)
+	if parseErr != nil {
+		log.Printf("ERROR SearchForMyNotification could not parse server response: %s", parseErr)
+		return false, errors.New("invalid server response")
+	}
+
+	urinodes := xmlquery.Find(parsedResponse, "//uri")
+	for _, node := range urinodes {
+		log.Print("INFO SearchForMyNotification checking ", node.InnerText())
+		result, err := TestDocument(r, node.InnerText(), &expectedUri, &notificationType)
+		if err != nil {
+			log.Print("ERROR SearchForMyNotification could not process: ", err)
+			return false, err
 		}
-
-		parsedResponse, parseErr := xmlquery.Parse(listResponse)
-		if parseErr != nil {
-			log.Printf("ERROR SearchForMyNotification could not parse server response: %s", parseErr)
-			return missingNotificationTypes, errors.New("Invalid server response")
-		}
-
-		urinodes := xmlquery.Find(parsedResponse, "//uri")
-		for _, node := range urinodes {
-			log.Print("INFO SearchForMyNotification checking ", node.InnerText())
-			result, err := TestDocument(r, node.InnerText(), &expectedUri, &nt)
-			if err != nil {
-				log.Print("ERROR SearchForMyNotification could not process: ", err)
-				return missingNotificationTypes, err
-			}
-			if result {
-				missingNotificationTypes = append(missingNotificationTypes, nt)
-			}
+		if result {
+			return true, nil
 		}
 	}
-	return missingNotificationTypes, nil
+
+	return false, nil
 }

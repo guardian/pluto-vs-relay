@@ -32,33 +32,34 @@ func CreateNotificationDoc(callbackUri string, jobType string) (string, error) {
     </job>
   </trigger>
 </NotificationDocument>`
-	_, test_err := xmlquery.Parse(strings.NewReader(basestring))
-	if test_err != nil {
-		return "", test_err
+	finalDoc := fmt.Sprintf(basestring, callbackUri, jobType)
+
+	_, testErr := xmlquery.Parse(strings.NewReader(finalDoc))
+	if testErr != nil {
+		log.Print("Failing document was: ", finalDoc)
+		return "", testErr
 	}
-	return fmt.Sprintf(basestring, callbackUri, jobType), nil
+	return finalDoc, nil
 }
 
-func CreateNotification(r *vidispine.VSRequestor, callback_uri string, requiredNotificationTypes []string) error {
-	for _, nt := range requiredNotificationTypes {
-		newdoc, build_err := CreateNotificationDoc(callback_uri, nt)
-		if build_err != nil {
-			log.Print("ERROR CreateNotification could not build a valid xml document: ", build_err)
-			return errors.New("could not build valid xml")
-		}
-
-		response, serverErr := r.Post("/API/job/notification",
-			"application/xml",
-			"application/xml",
-			strings.NewReader(newdoc),
-		)
-
-		if serverErr != nil {
-			return serverErr
-		}
-
-		serverResponseBytes, _ := ioutil.ReadAll(response)
-		log.Printf("Notification created succesfully: %s", string(serverResponseBytes))
+func CreateNotification(r *vidispine.VSRequestor, callback_uri string, notificationType string) error {
+	newdoc, build_err := CreateNotificationDoc(callback_uri, notificationType)
+	if build_err != nil {
+		log.Print("ERROR CreateNotification could not build a valid xml document: ", build_err)
+		return errors.New("could not build valid xml")
 	}
+
+	response, serverErr := r.Post("/API/job/notification",
+		"application/xml",
+		"application/xml",
+		strings.NewReader(newdoc),
+	)
+
+	if serverErr != nil {
+		return serverErr
+	}
+
+	serverResponseBytes, _ := ioutil.ReadAll(response)
+	log.Printf("Notification created succesfully: %s", string(serverResponseBytes))
 	return nil
 }
