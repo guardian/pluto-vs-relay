@@ -86,7 +86,7 @@ func (r *VSRequestor) Do(method string, subpath string, accept string, bodyConte
 
 	log.Printf("Performing %s to %s", method, urlToCall.String())
 
-	req, _ := http.NewRequest("GET", urlToCall.String(), body)
+	req, _ := http.NewRequest(method, urlToCall.String(), body)
 	req.Header.Add("Authorization", r.auth)
 	req.Header.Add("Accept", accept)
 	if bodyContentType != "" {

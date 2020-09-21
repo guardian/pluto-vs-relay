@@ -8,7 +8,21 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"time"
 )
+
+func setUpExchange(conn *amqp.Connection, exchangeName string) {
+	rmqChan, chanErr := conn.Channel()
+	if chanErr != nil {
+		log.Fatal("Could not establish initial connection to rabbitmq: ", chanErr)
+	}
+	defer rmqChan.Close()
+
+	declErr := rmqChan.ExchangeDeclare(exchangeName, "topic", true, false, false, false, nil)
+	if declErr != nil {
+		log.Fatal("Could not declare channel: ", declErr)
+	}
+}
 
 func main() {
 	vidispine_url_str := os.Getenv("VIDISPINE_URL")
@@ -16,6 +30,7 @@ func main() {
 	vidispine_passwd := os.Getenv("VIDISPINE_PASSWORD")
 	callback_uri_str := os.Getenv("CALLBACK_URI")
 	rabbitmq_uri_str := os.Getenv("RABBITMQ_URI")
+	exchangeName := os.Getenv("RABBITMQ_EXCHANGE")
 
 	if vidispine_url_str == "" || vidispine_user == "" || vidispine_passwd == "" {
 		log.Fatal("Please set VIDISPINE_URL, VIDISPINE_USER and VIDISPINE_PASSWORD in the environment")
@@ -27,6 +42,10 @@ func main() {
 
 	if rabbitmq_uri_str == "" {
 		log.Fatal("Please set RABBITMQ_URI in the environment")
+	}
+
+	if exchangeName == "" {
+		log.Fatal("Please set RABBITMQ_EXCHANGE in the environment")
 	}
 
 	vidispine_url, url_parse_err := url.Parse(vidispine_url_str)
@@ -60,12 +79,18 @@ func main() {
 		}
 	}
 
+	setUpExchange(rmq, exchangeName)
+
 	messageHandler := VidispineMessageHandler{
-		Connection: &mocks.AmqpConnectionShim{Connection: rmq},
+		Connection:     &mocks.AmqpConnectionShim{Connection: rmq},
+		ExchangeName:   exchangeName,
+		ChannelTimeout: 45 * time.Second,
 	}
+	healthcheckHandler := HealthcheckHandler{}
 
 	log.Printf("Callback URL path is %s", callback_url.Path)
 	http.Handle(callback_url.Path, messageHandler)
+	http.Handle("/healthcheck", healthcheckHandler)
 
 	log.Printf("Starting up on port 8080...")
 	startServeErr := http.ListenAndServe(":8080", nil)
