@@ -11,7 +11,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -87,6 +86,7 @@ func (h VidispineMessageHandler) backgroundRetryUntilSent(sendCompletedChan chan
 	defer rmqChan.Close()
 	confirmChan := make(chan amqp.Confirmation)
 
+	//set up a retry loop, this will establish a new channel and try to send on it. Successful send breaks the loop.
 	for {
 		//non-blocking check, if we have been sent abort signal
 		select {
@@ -161,7 +161,7 @@ func (h VidispineMessageHandler) ServeHTTP(w http.ResponseWriter, req *http.Requ
 	}
 
 	notificationPtr := &notification
-	routing_key := fmt.Sprintf("vidispine.job.%s", strings.ToLower(notificationPtr.GetAction()))
+	routing_key := fmt.Sprintf("vidispine.job.%s.%s", notificationPtr.GetType("unknown"), notificationPtr.GetAction())
 
 	log.Printf("DEBUG VidispineMessageHandler.ServeHTTP I will send the content %s to the routing key %s", string(bodyContent), routing_key)
 
