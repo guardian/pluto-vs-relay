@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/streadway/amqp"
 	"gitlab.com/codmill/customer-projects/guardian/pluto-vs-relay/mocks"
+	"gitlab.com/codmill/customer-projects/guardian/pluto-vs-relay/sender"
 	"gitlab.com/codmill/customer-projects/guardian/pluto-vs-relay/vidispine"
 	"log"
 	"net/http"
@@ -90,7 +91,9 @@ func main() {
 	setUpExchange(rmq, exchangeName)
 
 	messageHandler := VidispineMessageHandler{
-		Connection:     &mocks.AmqpConnectionShim{Connection: rmq},
+		ConnectionPool: sender.NewAmqpConnectionPool(&mocks.AmqpConnectionShim{
+			Connection: rmq,
+		}),
 		ExchangeName:   exchangeName,
 		ChannelTimeout: 45 * time.Second,
 	}
