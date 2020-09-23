@@ -47,7 +47,7 @@ func NewAmqpConnectionPool(conn mocks.AmqpConnectionInterface) AmqpConnectionPoo
 func (p *AmqpConnectionPoolImpl) setupWrapper() error {
 	p.mutex.Lock()
 	newWrapper, createErr := NewConnnectionWrapper(p.connection)
-	if createErr == nil {
+	if createErr != nil {
 		log.Print("Could not create a connection wrapper: ", createErr)
 		return createErr
 	}
