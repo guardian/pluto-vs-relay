@@ -24,7 +24,7 @@ type ConnectionWrapperImpl struct {
 	mutex                sync.Mutex
 }
 
-func NewConnnectionWrapper(conn mocks.AmqpConnectionInterface) (ConnectionWrapper, error) {
+func NewConnnectionWrapper(conn mocks.AmqpConnectionInterface, pendingMessages []connectionPoolMessage) (ConnectionWrapper, error) {
 	amqpChnl, chnlErr := conn.Channel()
 	if chnlErr != nil {
 		log.Print("ERROR NewConnectionWrapper could not create a channel: ", chnlErr)
@@ -33,8 +33,8 @@ func NewConnnectionWrapper(conn mocks.AmqpConnectionInterface) (ConnectionWrappe
 
 	w := &ConnectionWrapperImpl{
 		amqpChannel:          amqpChnl,
-		terminationChannel:   make(chan bool),
-		amqpConfirmChanel:    make(chan amqp.Confirmation),
+		terminationChannel:   make(chan bool, 1),
+		amqpConfirmChanel:    make(chan amqp.Confirmation, 5),
 		sendCounter:          0,
 		awaitingConfirmation: make(map[uint64]connectionPoolMessage),
 		mutex:                sync.Mutex{},
@@ -48,6 +48,12 @@ func NewConnnectionWrapper(conn mocks.AmqpConnectionInterface) (ConnectionWrappe
 	}
 	go w.pickUpConfirms()
 
+	for _, msg := range pendingMessages {
+		sendErr := w.Send(msg)
+		if sendErr != nil {
+			log.Printf("WARNING could not send pending message %s: %s", msg.String(), sendErr)
+		}
+	}
 	return w, nil
 }
 
@@ -81,9 +87,10 @@ re-initialised
 */
 func (w *ConnectionWrapperImpl) Send(message connectionPoolMessage) error {
 	w.mutex.Lock()
+	defer w.mutex.Unlock() //deliberate - don't release mutex until we have either published or failed. that will ensure
+	//that the counter actually does correspond to the delivery tag
 	w.sendCounter += 1
 	w.awaitingConfirmation[w.sendCounter] = message
-	w.mutex.Unlock()
 
 	return w.amqpChannel.Publish(message.exchange,
 		message.routingKey,
