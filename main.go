@@ -3,11 +3,14 @@ package main
 import (
 	"github.com/streadway/amqp"
 	"gitlab.com/codmill/customer-projects/guardian/pluto-vs-relay/mocks"
+	"gitlab.com/codmill/customer-projects/guardian/pluto-vs-relay/sender"
 	"gitlab.com/codmill/customer-projects/guardian/pluto-vs-relay/vidispine"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
@@ -44,6 +47,25 @@ func setUpNotifications(vidispine_url *url.URL, requestor *vidispine.VSRequestor
 	}
 }
 
+/**
+sets up a signal handler to terminate cleanly if we receive SIGINT or SIGTERM
+*/
+func handleSignals(rmq mocks.AmqpConnectionInterface) {
+	sigChan := make(chan os.Signal, 1) //buffer of 1 signal in case we're not in receiving state when it comes through
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		receivedSig := <-sigChan
+		log.Printf("INFO handleSignals received %s, shutting down in 5s", receivedSig.String())
+		time.Sleep(5 * time.Second)
+		closeErr := rmq.Close()
+		if closeErr != nil {
+			log.Print("ERROR handleSignals could not close connection: ", closeErr)
+		}
+		os.Exit(0)
+	}()
+}
+
 func main() {
 	vidispine_url_str := os.Getenv("VIDISPINE_URL")
 	vidispine_user := os.Getenv("VIDISPINE_USER")
@@ -57,7 +79,7 @@ func main() {
 	}
 
 	if callback_uri_str == "" {
-		log.Fatal("Please set CALLBACK_URI int the environment")
+		log.Fatal("Please set CALLBACK_URI in the environment")
 	}
 
 	if rabbitmq_uri_str == "" {
@@ -83,6 +105,32 @@ func main() {
 		log.Fatal("Could not connect to rabbitmq: ", rmqErr)
 	}
 
+	conn := &mocks.AmqpConnectionShim{
+		Connection: rmq,
+	}
+
+	/*
+		ensure that rabbitmq connection is terminated cleanly even if program exits uncleanly
+	*/
+	defer func() {
+		if r := recover(); r != nil {
+			log.Print("WARNING main Program is existing due to panic")
+			if rmq != nil && !rmq.IsClosed() {
+				log.Print("INFO main Shutting down broker connection")
+				closeErr := rmq.Close()
+				if closeErr != nil {
+					log.Print("ERROR main Could not shut down broker connection but terminating anyway ", closeErr)
+				}
+			}
+			os.Exit(0xFF)
+		}
+	}()
+
+	/*
+		ensure that rabbiqmq connection is terminated cleanly if we receive termination signal
+	*/
+	handleSignals(conn)
+
 	requestor := vidispine.NewVSRequestor(*vidispine_url, vidispine_user, vidispine_passwd)
 
 	setUpNotifications(vidispine_url, requestor, callback_url)
@@ -90,7 +138,7 @@ func main() {
 	setUpExchange(rmq, exchangeName)
 
 	messageHandler := VidispineMessageHandler{
-		Connection:     &mocks.AmqpConnectionShim{Connection: rmq},
+		ConnectionPool: sender.NewAmqpConnectionPool(conn),
 		ExchangeName:   exchangeName,
 		ChannelTimeout: 45 * time.Second,
 	}
