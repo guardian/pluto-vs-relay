@@ -11,8 +11,9 @@ import (
 type ObjectClass string
 
 const (
-	Job      = "job"
-	Metadata = "metadata"
+	Job   = "job"
+	Item  = "item"
+	Shape = "shape"
 )
 
 /**

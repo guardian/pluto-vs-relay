@@ -25,20 +25,32 @@ func setUpExchange(conn *amqp.Connection, exchangeName string) {
 }
 
 func setUpNotifications(vidispine_url *url.URL, requestor *vidispine.VSRequestor, callback_url *url.URL) {
-	expectedNotificationTypes := []string{"stop", "update", "create"}
-	expectedNotificationClasses := []ObjectClass{Job, Metadata}
-
+	expectedNotificationClasses := []ObjectClass{Job, Item, Shape}
+	expectedNotificationTypes := map[string][]string{
+		Job: {"stop",
+			"update",
+			"create",
+		},
+		Item: {"create", //output parms: itemId, action
+			"delete", //output parms: itemId, action
+			"modify", //output parms: changeSetId, itemId
+		},
+		Shape: {"create", //output parms: notificationType, notificationTrigger, itemId, shapeId
+			"delete", //output parms: notificationType, notificationTrigger, itemId, shapeId
+			"modify", //output parms: notificationType, notificationTrigger, itemId, shapeId
+		},
+	}
 	log.Print("Checking for our notifications in ", vidispine_url.String())
 
 	for _, cls := range expectedNotificationClasses {
-		for _, nt := range expectedNotificationTypes {
+		for _, nt := range expectedNotificationTypes[string(cls)] {
 			notificationPresent, check_err := SearchForMyNotification(requestor, callback_url.String(), cls, nt)
 			if check_err != nil {
 				log.Fatal("Could not check for notification: ", check_err)
 			}
 
 			if !notificationPresent {
-				log.Printf("INFO setUpNotifications missing %s notification", nt)
+				log.Printf("INFO setUpNotifications missing %s %s notification", cls, nt)
 				createErr := CreateNotification(requestor, callback_url.String(), cls, nt)
 				if createErr != nil {
 					log.Fatal("Could not create notification: ", createErr)
