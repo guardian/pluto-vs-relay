@@ -8,6 +8,13 @@ import (
 	"log"
 )
 
+type ObjectClass string
+
+const (
+	Job      = "job"
+	Metadata = "metadata"
+)
+
 /**
 check if the url given in the document is the one we expect
 */
@@ -55,8 +62,9 @@ func TestDocument(r *vidispine.VSRequestor, docurl string, expectedUriPtr *strin
 Searches all available notifications to find our ones.
 Returns a list of the notification types that are _missing_.
 */
-func SearchForMyNotification(r *vidispine.VSRequestor, expectedUri string, notificationType string) (bool, error) {
-	listResponse, serverErr := r.Get("/API/job/notification", "application/xml")
+func SearchForMyNotification(r *vidispine.VSRequestor, expectedUri string, objectClass ObjectClass, notificationType string) (bool, error) {
+	baseUrl := fmt.Sprintf("/API/%s/notification", objectClass)
+	listResponse, serverErr := r.Get(baseUrl, "application/xml")
 	if serverErr != nil {
 		return false, serverErr
 	}

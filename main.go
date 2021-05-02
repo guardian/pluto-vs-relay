@@ -26,19 +26,23 @@ func setUpExchange(conn *amqp.Connection, exchangeName string) {
 
 func setUpNotifications(vidispine_url *url.URL, requestor *vidispine.VSRequestor, callback_url *url.URL) {
 	expectedNotificationTypes := []string{"stop", "update", "create"}
+	expectedNotificationClasses := []ObjectClass{Job, Metadata}
+
 	log.Print("Checking for our notifications in ", vidispine_url.String())
 
-	for _, nt := range expectedNotificationTypes {
-		notificationPresent, check_err := SearchForMyNotification(requestor, callback_url.String(), nt)
-		if check_err != nil {
-			log.Fatal("Could not check for notification: ", check_err)
-		}
+	for _, cls := range expectedNotificationClasses {
+		for _, nt := range expectedNotificationTypes {
+			notificationPresent, check_err := SearchForMyNotification(requestor, callback_url.String(), cls, nt)
+			if check_err != nil {
+				log.Fatal("Could not check for notification: ", check_err)
+			}
 
-		if !notificationPresent {
-			log.Printf("INFO setUpNotifications missing %s notification", nt)
-			createErr := CreateNotification(requestor, callback_url.String(), nt)
-			if createErr != nil {
-				log.Fatal("Could not create notification: ", createErr)
+			if !notificationPresent {
+				log.Printf("INFO setUpNotifications missing %s notification", nt)
+				createErr := CreateNotification(requestor, callback_url.String(), cls, nt)
+				if createErr != nil {
+					log.Fatal("Could not create notification: ", createErr)
+				}
 			}
 		}
 	}

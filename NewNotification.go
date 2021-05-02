@@ -42,14 +42,15 @@ func CreateNotificationDoc(callbackUri string, jobType string) (string, error) {
 	return finalDoc, nil
 }
 
-func CreateNotification(r *vidispine.VSRequestor, callback_uri string, notificationType string) error {
+func CreateNotification(r *vidispine.VSRequestor, callback_uri string, objectClass ObjectClass, notificationType string) error {
 	newdoc, build_err := CreateNotificationDoc(callback_uri, notificationType)
 	if build_err != nil {
 		log.Print("ERROR CreateNotification could not build a valid xml document: ", build_err)
 		return errors.New("could not build valid xml")
 	}
 
-	response, serverErr := r.Post("/API/job/notification",
+	urlPath := fmt.Sprintf("/API/%s/notification", objectClass)
+	response, serverErr := r.Post(urlPath,
 		"application/xml",
 		"application/xml",
 		strings.NewReader(newdoc),
