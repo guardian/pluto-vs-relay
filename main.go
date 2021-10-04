@@ -27,21 +27,35 @@ func setUpExchange(conn *amqp.Connection, exchangeName string) {
 	}
 }
 
-func setUpNotifications(vidispine_url *url.URL, requestor *vidispine.VSRequestor, callback_url *url.URL) {
-	expectedNotificationTypes := []string{"stop", "update", "create"}
+func setUpNotifications(vidispine_url *url.URL, requestor *vidispine.VSRequestor, callbackUrl *url.URL) {
+	/*
+		we define the information that we are checking for with these three arrays. They all need to have the same number
+		of (top-level) elements. The first element of `expectedNotificationTypes` is another array consisting of the "notification
+		type" parameter for the first entity type and the first element of `requiredSubpaths` is the subpath of `callbackUrl`
+		where we want that notification delivered
+	*/
+	expectedEntityTypes := []string{"job", "metadata", "item"}
+	expectedNotificationTypes := [][]string{
+		{"stop", "update", "create"},
+		{"modify"},
+		{"create", "delete"},
+	}
+	requiredSubpaths := []string{"/job", "/item/metadata", "/item"}
 	log.Print("Checking for our notifications in ", vidispine_url.String())
 
-	for _, nt := range expectedNotificationTypes {
-		notificationPresent, check_err := SearchForMyNotification(requestor, callback_url.String(), nt)
-		if check_err != nil {
-			log.Fatal("Could not check for notification: ", check_err)
-		}
+	for entityIndex, et := range expectedEntityTypes {
+		for _, nt := range expectedNotificationTypes[entityIndex] {
+			notificationPresent, check_err := SearchForMyNotification(requestor, callbackUrl.String()+requiredSubpaths[entityIndex], et, nt)
+			if check_err != nil {
+				log.Fatal("Could not check for notification: ", check_err)
+			}
 
-		if !notificationPresent {
-			log.Printf("INFO setUpNotifications missing %s notification", nt)
-			createErr := CreateNotification(requestor, callback_url.String(), nt)
-			if createErr != nil {
-				log.Fatal("Could not create notification: ", createErr)
+			if !notificationPresent {
+				log.Printf("INFO setUpNotifications missing %s %s notification", et, nt)
+				createErr := CreateNotification(requestor, callbackUrl.String()+requiredSubpaths[entityIndex], et, nt)
+				if createErr != nil {
+					log.Fatal("Could not create notification: ", createErr)
+				}
 			}
 		}
 	}
@@ -70,7 +84,7 @@ func main() {
 	vidispine_url_str := os.Getenv("VIDISPINE_URL")
 	vidispine_user := os.Getenv("VIDISPINE_USER")
 	vidispine_passwd := os.Getenv("VIDISPINE_PASSWORD")
-	callback_uri_str := os.Getenv("CALLBACK_URI")
+	callback_uri_str := os.Getenv("CALLBACK_BASE")
 	rabbitmq_uri_str := os.Getenv("RABBITMQ_URI")
 	exchangeName := os.Getenv("RABBITMQ_EXCHANGE")
 
@@ -79,7 +93,7 @@ func main() {
 	}
 
 	if callback_uri_str == "" {
-		log.Fatal("Please set CALLBACK_URI in the environment")
+		log.Fatal("Please set CALLBACK_BASE in the environment")
 	}
 
 	if rabbitmq_uri_str == "" {
@@ -97,7 +111,7 @@ func main() {
 
 	callback_url, url_parse_err := url.Parse(callback_uri_str)
 	if url_parse_err != nil {
-		log.Fatal("CALLBACK_URI is not valid: ", url_parse_err)
+		log.Fatal("CALLBACK_BASE is not valid: ", url_parse_err)
 	}
 
 	rmq, rmqErr := amqp.Dial(rabbitmq_uri_str)
@@ -136,16 +150,30 @@ func main() {
 	setUpNotifications(vidispine_url, requestor, callback_url)
 
 	setUpExchange(rmq, exchangeName)
+	amqpPool := sender.NewAmqpConnectionPool(conn)
 
-	messageHandler := VidispineMessageHandler{
-		ConnectionPool: sender.NewAmqpConnectionPool(conn),
+	jobMessageHandler := VidispineMessageHandler{
+		ConnectionPool: amqpPool,
+		ExchangeName:   exchangeName,
+		ChannelTimeout: 45 * time.Second,
+	}
+	itemMessageHandler := VidispineItemMessageHandler{
+		ConnectionPool: amqpPool,
+		ExchangeName:   exchangeName,
+		ChannelTimeout: 45 * time.Second,
+	}
+	metaMessageHandler := VidispineMetadataMessageHandler{
+		ConnectionPool: amqpPool,
 		ExchangeName:   exchangeName,
 		ChannelTimeout: 45 * time.Second,
 	}
 	healthcheckHandler := HealthcheckHandler{}
 
 	log.Printf("Callback URL path is %s", callback_url.Path)
-	http.Handle(callback_url.Path, messageHandler)
+	http.Handle(callback_url.Path+"/job", jobMessageHandler)
+	http.Handle(callback_url.Path+"/item/metadata", metaMessageHandler)
+	http.Handle(callback_url.Path+"/item", itemMessageHandler)
+
 	http.Handle("/healthcheck", healthcheckHandler)
 
 	log.Printf("Starting up on port 8080...")

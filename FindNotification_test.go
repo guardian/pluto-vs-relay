@@ -72,12 +72,13 @@ func TestCheckNotificationType(t *testing.T) {
 	}
 
 	expectedNotificationType := "stop"
-	if !CheckNotificationType(&expectedNotificationType, doc) {
+	expectedEntityType := "job"
+	if !CheckNotificationType(&expectedNotificationType, &expectedEntityType, doc) {
 		t.Error("Could not find existing notification type of 'stop'")
 	}
 
 	unExpectedNotificationType := "rhubarb"
-	if CheckNotificationType(&unExpectedNotificationType, doc) {
+	if CheckNotificationType(&unExpectedNotificationType, &expectedEntityType, doc) {
 		t.Error("Got unexpected notification type")
 	}
 }

@@ -97,8 +97,10 @@ func (w *ConnectionWrapperImpl) Send(message connectionPoolMessage) error {
 		true,
 		false,
 		amqp.Publishing{
+			Headers:         map[string]interface{}{"Timestamp": message.timestamp.Format(time.RFC3339Nano)},
 			ContentEncoding: "utf-8",
 			ContentType:     "application/json",
+			Timestamp:       message.timestamp,
 			MessageId:       message.msgId.String(),
 			Body:            *message.content,
 		})
