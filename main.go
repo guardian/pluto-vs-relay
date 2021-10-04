@@ -28,6 +28,12 @@ func setUpExchange(conn *amqp.Connection, exchangeName string) {
 }
 
 func setUpNotifications(vidispine_url *url.URL, requestor *vidispine.VSRequestor, callbackUrl *url.URL) {
+	/*
+		we define the information that we are checking for with these three arrays. They all need to have the same number
+		of (top-level) elements. The first element of `expectedNotificationTypes` is another array consisting of the "notification
+		type" parameter for the first entity type and the first element of `requiredSubpaths` is the subpath of `callbackUrl`
+		where we want that notification delivered
+	*/
 	expectedEntityTypes := []string{"job", "metadata", "item"}
 	expectedNotificationTypes := [][]string{
 		{"stop", "update", "create"},

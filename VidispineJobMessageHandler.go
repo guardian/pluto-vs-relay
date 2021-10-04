@@ -24,7 +24,6 @@ func (h VidispineMessageHandler) ServeHTTP(w http.ResponseWriter, req *http.Requ
 	}
 	routingKey := fmt.Sprintf("vidispine.job.%s.%s", notificationPtr.GetType("unknown"), notificationPtr.GetAction())
 
-	//log.Printf("DEBUG VidispineMessageHandler.ServeHTTP I will send the content %s to the routing key %s", string(bodyContent), routing_key)
 	log.Printf("DEBUG VidispineMessageHandler.ServeHTTP received message for %s", routingKey)
 	sendErr := h.ConnectionPool.Send(h.ExchangeName, routingKey, bodyContentPtr)
 

@@ -23,7 +23,7 @@ func (h VidispineMetadataMessageHandler) ServeHTTP(w http.ResponseWriter, req *h
 	}
 	routingKey := "vidispine.item.metadata.modify"
 
-	log.Printf("DEBUG VidispineItemMessageHandler.ServeHTTP received message for %s", routingKey)
+	log.Printf("DEBUG VidispineMetadataMessageHandler.ServeHTTP received message for %s", routingKey)
 	sendErr := h.ConnectionPool.Send(h.ExchangeName, routingKey, bodyContentPtr)
 
 	if sendErr == nil {
