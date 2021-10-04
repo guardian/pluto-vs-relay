@@ -18,6 +18,7 @@ type connectionPoolMessage struct {
 	routingKey string
 	content    *[]byte
 	msgId      uuid.UUID
+	timestamp  time.Time
 }
 
 func (m *connectionPoolMessage) String() string {
@@ -69,6 +70,7 @@ func (p *AmqpConnectionPoolImpl) Send(exchange string, routingKey string, conten
 		exchange:   exchange,
 		routingKey: routingKey,
 		content:    content,
+		timestamp:  time.Now(),
 		msgId:      uuid.New(),
 	}
 
