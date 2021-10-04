@@ -31,8 +31,6 @@ func GetNotificationDocument(w http.ResponseWriter, req *http.Request) (*VSNotif
 		return nil, nil
 	}
 
-	log.Printf("DEBUG received notification content %s", string(bodyContent))
-
 	var notification VSNotificationDocument
 	parseErr := json.Unmarshal(bodyContent, &notification)
 	if parseErr != nil {
