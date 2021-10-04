@@ -45,7 +45,7 @@ func setUpNotifications(vidispine_url *url.URL, requestor *vidispine.VSRequestor
 			}
 
 			if !notificationPresent {
-				log.Printf("INFO setUpNotifications missing %s notification", nt)
+				log.Printf("INFO setUpNotifications missing %s %s notification", et, nt)
 				createErr := CreateNotification(requestor, callbackUrl.String()+requiredSubpaths[entityIndex], et, nt)
 				if createErr != nil {
 					log.Fatal("Could not create notification: ", createErr)

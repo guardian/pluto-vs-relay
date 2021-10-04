@@ -25,9 +25,8 @@ func CheckUrlPath(expectedUrlPath *string, doc *xmlquery.Node) bool {
 /**
 check if the notification type in the document is the one we expect
 */
-func CheckNotificationType(nt *string, doc *xmlquery.Node) bool {
-	triggerNodes := xmlquery.Find(doc, fmt.Sprintf("//trigger//job//%s", *nt))
-
+func CheckNotificationType(nt *string, et *string, doc *xmlquery.Node) bool {
+	triggerNodes := xmlquery.Find(doc, fmt.Sprintf("//trigger//%s//%s", *et, *nt))
 	return len(triggerNodes) == 1 //multiple nodes don't work
 }
 
@@ -35,7 +34,7 @@ func CheckNotificationType(nt *string, doc *xmlquery.Node) bool {
 test the notification whose spec is at the given url to see if the notification type and url match.
 returns "true" if the doc matches or "false" otherwise
 */
-func TestDocument(r *vidispine.VSRequestor, docurl string, expectedUriPtr *string, notificationTypePtr *string) (bool, error) {
+func TestDocument(r *vidispine.VSRequestor, docurl string, expectedUriPtr *string, entityTypePtr *string, notificationTypePtr *string) (bool, error) {
 	notificationDoc, serverErr := r.Get(docurl, "application/xml")
 	if serverErr != nil {
 		return false, serverErr
@@ -47,7 +46,7 @@ func TestDocument(r *vidispine.VSRequestor, docurl string, expectedUriPtr *strin
 	}
 
 	urlMatch := CheckUrlPath(expectedUriPtr, parsedNotification)
-	notificationTypeMatch := CheckNotificationType(notificationTypePtr, parsedNotification)
+	notificationTypeMatch := CheckNotificationType(notificationTypePtr, entityTypePtr, parsedNotification)
 	return urlMatch && notificationTypeMatch, nil
 }
 
@@ -78,7 +77,7 @@ func SearchForMyNotification(r *vidispine.VSRequestor, expectedUri string, entit
 	urinodes := xmlquery.Find(parsedResponse, "//uri")
 	for _, node := range urinodes {
 		log.Print("INFO SearchForMyNotification checking ", node.InnerText())
-		result, err := TestDocument(r, node.InnerText(), &expectedUri, &notificationType)
+		result, err := TestDocument(r, node.InnerText(), &expectedUri, &entityType, &notificationType)
 		if err != nil {
 			log.Print("ERROR SearchForMyNotification could not process: ", err)
 			return false, err
