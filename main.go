@@ -34,13 +34,14 @@ func setUpNotifications(vidispine_url *url.URL, requestor *vidispine.VSRequestor
 		type" parameter for the first entity type and the first element of `requiredSubpaths` is the subpath of `callbackUrl`
 		where we want that notification delivered
 	*/
-	expectedEntityTypes := []string{"job", "metadata", "item"}
+	expectedEntityTypes := []string{"job", "metadata", "item", "shape"}
 	expectedNotificationTypes := [][]string{
 		{"stop", "update", "create"},
 		{"modify"},
 		{"create", "delete"},
+		{"create", "modify", "delete"},
 	}
-	requiredSubpaths := []string{"/job", "/item/metadata", "/item"}
+	requiredSubpaths := []string{"/job", "/item/metadata", "/item", "/item/shape"}
 	log.Print("Checking for our notifications in ", vidispine_url.String())
 
 	for entityIndex, et := range expectedEntityTypes {
@@ -167,13 +168,18 @@ func main() {
 		ExchangeName:   exchangeName,
 		ChannelTimeout: 45 * time.Second,
 	}
+	shapeMessageHandler := VidispineShapeMessageHandler{
+		ConnectionPool: amqpPool,
+		ExchangeName:   exchangeName,
+		ChannelTimeout: 45 * time.Second,
+	}
 	healthcheckHandler := HealthcheckHandler{}
 
 	log.Printf("Callback URL path is %s", callback_url.Path)
 	http.Handle(callback_url.Path+"/job", jobMessageHandler)
 	http.Handle(callback_url.Path+"/item/metadata", metaMessageHandler)
 	http.Handle(callback_url.Path+"/item", itemMessageHandler)
-
+	http.Handle(callback_url.Path+"/item/shape", shapeMessageHandler)
 	http.Handle("/healthcheck", healthcheckHandler)
 
 	log.Printf("Starting up on port 8080...")

@@ -25,15 +25,18 @@ func (doc *VSNotificationDocument) FindKey(key string) (KeyValuePair, bool) {
 
 /**
 returns the value of the "action" field (i.e., create/stop/update) or an empty string
-if none is set
+if none is set.
 */
 func (doc *VSNotificationDocument) GetAction() string {
 	entry, didFind := doc.FindKey("action")
 	if didFind {
 		return strings.ToLower(entry.Value)
-	} else {
-		return ""
 	}
+	alternativeEntry, didFind := doc.FindKey("notificationTrigger") //in shape messages the equivalent data is in "notificationTrigger"
+	if didFind {
+		return strings.ToLower(alternativeEntry.Value)
+	}
+	return ""
 }
 
 /**
