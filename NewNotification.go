@@ -73,7 +73,7 @@ func CreateNotification(r *vidispine.VSRequestor, callback_uri string, entityTyp
 	}
 
 	urlEntityType := entityType
-	if entityType == "metadata" {
+	if entityType == "metadata" || entityType == "shape" {
 		urlEntityType = "item" //metadata updates get sent to to /item endpoint
 	}
 	response, serverErr := r.Post(

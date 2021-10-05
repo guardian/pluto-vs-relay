@@ -56,7 +56,7 @@ Returns a list of the notification types that are _missing_.
 */
 func SearchForMyNotification(r *vidispine.VSRequestor, expectedUri string, entityType string, notificationType string) (bool, error) {
 	urlEntityType := entityType
-	if entityType == "metadata" {
+	if entityType == "metadata" || entityType == "shape" {
 		urlEntityType = "item" //metadata updates get sent to to /item endpoint
 	}
 	listResponse, serverErr := r.Get(
