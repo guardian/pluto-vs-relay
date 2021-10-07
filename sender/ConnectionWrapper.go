@@ -17,6 +17,7 @@ type ConnectionWrapper interface {
 type ConnectionWrapperImpl struct {
 	amqpChannel        mocks.AmqpChannelInterface
 	terminationChannel chan bool
+	terminationWaiter  sync.WaitGroup
 	amqpConfirmChanel  chan amqp.Confirmation
 	sendCounter        uint64
 	//this is a map of (delivery_tag, source) that contains content which has not yet been acked
@@ -34,6 +35,7 @@ func NewConnnectionWrapper(conn mocks.AmqpConnectionInterface, pendingMessages [
 	w := &ConnectionWrapperImpl{
 		amqpChannel:          amqpChnl,
 		terminationChannel:   make(chan bool, 1),
+		terminationWaiter:    sync.WaitGroup{},
 		amqpConfirmChanel:    make(chan amqp.Confirmation, 5),
 		sendCounter:          0,
 		awaitingConfirmation: make(map[uint64]connectionPoolMessage),
@@ -61,17 +63,23 @@ func NewConnnectionWrapper(conn mocks.AmqpConnectionInterface, pendingMessages [
 this is a goroutine that listens for confirmation messages
 */
 func (w *ConnectionWrapperImpl) pickUpConfirms() {
+	w.terminationWaiter.Add(1)
 	for {
 		select {
 		case <-w.terminationChannel:
 			log.Print("INFO ConnectionWrapperImpl.pickUpConfirms requested termination, shutting down")
+			w.terminationWaiter.Done()
 			return
 		case msg := <-w.amqpConfirmChanel:
 			if msg.Ack {
+				w.mutex.Lock()
 				delete(w.awaitingConfirmation, msg.DeliveryTag)
+				w.mutex.Unlock()
 			} else {
 				log.Print("WARNING ConnectionWrapperImpl.pickUpConfirms server rejected message, resending")
+				w.mutex.Lock()
 				originalSource := w.awaitingConfirmation[msg.DeliveryTag]
+				w.mutex.Unlock()
 				go func() {
 					time.Sleep(3 * time.Second)
 					w.Send(originalSource)
@@ -112,7 +120,10 @@ func (w *ConnectionWrapperImpl) Finish() []connectionPoolMessage {
 		log.Print("ERROR ConnectionWrapper.Finish could not close broker channel: ", closeErr)
 	}
 
+	log.Print("DEBUG ConnectionWrapper.Finish waiting for confirm receive routine to terminate")
 	w.terminationChannel <- true
+	w.terminationWaiter.Wait()
+	log.Printf("DEBUG ConnectionWrapper.Finish done.")
 	pendingMessages := make([]connectionPoolMessage, len(w.awaitingConfirmation))
 	i := 0
 	for _, msg := range w.awaitingConfirmation {
