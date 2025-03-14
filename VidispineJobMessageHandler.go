@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"gitlab.com/codmill/customer-projects/guardian/pluto-vs-relay/sender"
 	"log"
 	"net/http"
 	"time"
+
+	"gitlab.com/codmill/customer-projects/guardian/pluto-vs-relay/sender"
 )
 
 type VidispineMessageHandler struct {
@@ -14,7 +15,8 @@ type VidispineMessageHandler struct {
 	ExchangeName   string
 }
 
-/**
+/*
+*
 receive the message from VS and pass it on
 */
 func (h VidispineMessageHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -24,7 +26,7 @@ func (h VidispineMessageHandler) ServeHTTP(w http.ResponseWriter, req *http.Requ
 	}
 	routingKey := fmt.Sprintf("vidispine.job.%s.%s", notificationPtr.GetType("unknown"), notificationPtr.GetAction())
 
-	log.Printf("DEBUG VidispineMessageHandler.ServeHTTP received message for %s", routingKey)
+	log.Printf("DEBUG VidispineMessageHandler.ServeHTTP received message for %s, body: %s, exchangeName: %s", routingKey, bodyContentPtr, h.ExchangeName)
 	sendErr := h.ConnectionPool.Send(h.ExchangeName, routingKey, bodyContentPtr)
 
 	if sendErr == nil {
